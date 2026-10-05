@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <sys/wait.h>
 
 int global_data = 42; //DATA - variable initialisé 
 
@@ -35,13 +36,28 @@ int main(void) {
     printf("LibC : %p\n", &printf);
     printf("Mmap : %p\n", mmap_area);
 
-    printf("\nPID : %d\n", getpid());
+    int pid = getpid();
+    printf("\nPID : %d\n", pid);
 
     printf("\n|---------------------- PMAP ----------------------|\n");
-    char pid_str[16];
-    snprintf(pid_str, sizeof(pid_str), "%d", getpid());
-    execlp("pmap","pmap","-X",pid_str,NULL);
-    perror("execl");
+    int child = fork();
+
+    if (child == -1) {
+        perror("fork");
+        munmap(mmap_area, 4096);
+        free(heap);
+        return EXIT_FAILURE;
+    }
+    if (child == 0) {
+        //fils
+        char pid_str[16];
+        snprintf(pid_str, sizeof(pid_str), "%d", pid);
+        execlp("pmap", "pmap", "-X", pid_str, NULL);
+        perror("execlp");
+        return EXIT_FAILURE;
+    }
+    
+    waitpid(child, NULL, 0);
 
     // free
     munmap(mmap_area, 4096);
